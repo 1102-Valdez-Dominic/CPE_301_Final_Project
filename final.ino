@@ -1,6 +1,8 @@
 //Authors: Dominic Valdez, Hamza Syed, 
 //Date: 4/18/24
 
+//headers 
+
  #define RDA 0x80
  #define TBE 0x20  
  volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
@@ -15,7 +17,7 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+
 
 }
 
