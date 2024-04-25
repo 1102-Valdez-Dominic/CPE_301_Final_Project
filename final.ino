@@ -3,8 +3,13 @@
 
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
+
 //liquid crystal display library
 #include <LiquidCrystal.h>
+
+//DHT library for temp and humidity sensor
+#include <dht.h>
+
 
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 2038;
@@ -30,6 +35,9 @@ volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
 volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
 volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 
+//Variables for the 1 minute delay for the LCD updates
+unsigned long previousMillis = 0;  // will store last time LCD was updated
+const long interval = 60000;  // interval at which to update LCD (milliseconds)
 
 void setup() {
   // initialize the serial port on USART0:
@@ -37,6 +45,12 @@ void setup() {
   // setup the ADC
   adc_init();
   // Nothing to do for stepper motor (Stepper Library sets pins as outputs)
+
+  // For @buttercup
+  //Setup for attach_interupt 
+  //pinMode(ledPin, OUTPUT); Change to GPIO of Start button pin
+  //pinMode(interruptPin, INPUT_PULLUP); Change to GPIO of interruptPin, USE PIN 2!! 
+  //attachInterrupt(digitalPinToInterrupt(interruptPin), ??? , RISING); In the ??? space but the name of the function that is called when button is pressed. The function should basically just be flag variable that changes from 0 to 1 so the state can transition 
 }
 
 void loop() {
@@ -44,14 +58,29 @@ void loop() {
     // Rotate CW slowly at 5 RPM
     myStepper.setSpeed(5);
     myStepper.step(stepsPerRevolution);
-    delay(1000);
+    //delay(1000); Use custom delay function
+
     // Rotate CCW quickly at 10 RPM
     myStepper.setSpeed(10);
     myStepper.step(-stepsPerRevolution);
-    delay(1000);
-}
+    //delay(1000); Use custom delay function
+ 
+
+  // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
+  unsigned long currentMillis = millis(); 
+
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you updated the LCD
+    previousMillis = currentMillis;
+
+    // Write code that updates the LCD with Humidity and temperature for all states EXCEPT Disabled. 
+
+    
+  }
 
 }
+
+
 
 void adc_init()
 {
@@ -132,3 +161,4 @@ void U0putchar(unsigned char U0pdata)
   while ((*myUCSR0A & TBE)==0){};
   *myUDR0 = U0pdata;
 }
+
