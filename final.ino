@@ -3,12 +3,19 @@
 
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
+//liquid crystal display library
+#include <LiquidCrystal.h>
 
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 2038;
 // Creates an instance of stepper class
 // Pins entered in sequence IN1-IN3-IN2-IN4 for proper step sequence
 Stepper myStepper = Stepper(stepsPerRevolution, 8, 10, 9, 11);
+
+// LCD pins <--> Arduino pins
+const int RS = 11, EN = 12, D4 = 2, D5 = 3, D6 = 4, D7 = 5;
+LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
+//lcd.write()
 
  #define RDA 0x80
  #define TBE 0x20  
