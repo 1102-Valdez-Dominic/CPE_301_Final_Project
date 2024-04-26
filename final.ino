@@ -1,6 +1,8 @@
 //Authors: Dominic Valdez, Hamza Syed, 
 //Date: 4/18/24
 
+/* Updates on 4/26/2024: New DHT11 Library included, water sensor library added, tested DHT sensor and LCD  together on board with the 1 minute delay, works. */ 
+
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
 
@@ -8,25 +10,30 @@
 #include <LiquidCrystal.h>
 
 //DHT library for temp and humidity sensor
-#include <dht.h>
+#include <DHT11.h>
 
-dht DHT;
+DHT11 dht11(22);
 
 
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 2038;
 // Creates an instance of stepper class
 // Pins entered in sequence IN1-IN3-IN2-IN4 for proper step sequence
-Stepper myStepper = Stepper(stepsPerRevolution, 8, 10, 9, 11);
+Stepper myStepper = Stepper(stepsPerRevolution, 46, 50, 48, 52);
 
 // LCD pins <--> Arduino pins
-const int RS = 11, EN = 12, D4 = 2, D5 = 3, D6 = 4, D7 = 5;
+const int RS = 12, EN = 11, D4 = 5, D5 = 4, D6 = 3, D7 = 2;
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 //lcd.write()
 
  #define RDA 0x80
  #define TBE 0x20  
- #define DHT11_PIN 7
+
+ #define DHT11_PIN 7 // Pin for temp and humidity sensor
+
+//Pins for the water sensor
+#define POWER_PIN 7 // CHANGE to GPIO digital pin 7
+#define SIGNAL_PIN A5 // CHANGE to GPIO, Analog pin 5
 
  volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
  volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
@@ -43,6 +50,14 @@ volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 unsigned long previousMillis = 0;  // will store last time LCD was updated
 const long interval = 60000;  // interval at which to update LCD (milliseconds)
 
+int temperature = 0;
+int humidity = 0;
+int result = 0; //Variable to store temp and humidity values
+
+int water_value = 0; // variable to store the water sensor value
+
+int state = 0; //Variable to keep track of the states, 0 = disabled, 1 = idle, 2 = error, 3 = running
+
 void setup() {
   // initialize the serial port on USART0:
   U0init(9600);
@@ -53,43 +68,41 @@ void setup() {
   // For @buttercup
   //Setup for attach_interupt 
   //pinMode(ledPin, OUTPUT); Change to GPIO of Start button pin
-  //pinMode(interruptPin, INPUT_PULLUP); Change to GPIO of interruptPin, USE PIN 2!! 
+  //pinMode(interruptPin, INPUT_PULLUP); Change to GPIO of interruptPin, USE digital PIN 18!! 
   //attachInterrupt(digitalPinToInterrupt(interruptPin), ??? , RISING); In the ??? space but the name of the function that is called when button is pressed. The function should basically just be flag variable that changes from 0 to 1 so the state can transition 
 
   //liquid crystal initialization
-  lcd.begin(16, 2);
+  lcd.clear();
+  lcd.begin(16, 2);// set up number of columns and rows
+  lcd.setCursor(0, 0); // move cursor to (0, 0)
+
+
+//Setup for Water Sensor
+pinMode (POWER_PIN, OUTPUT); //Replace with GPIO. Configure D7 pin as an OUTPUT for Water sensor. 
+digitalWrite (POWER_PIN, LOW); //Replace with GPIO. Turn the water sensor OFF. 
+
 
 }
 
 void loop() {
   //Stepper motor Example code:
     // Rotate CW slowly at 5 RPM
-    myStepper.setSpeed(5);
-    myStepper.step(stepsPerRevolution);
+    //myStepper.setSpeed(5);
+    //myStepper.step(stepsPerRevolution);
     //delay(1000); Use custom delay function
 
     // Rotate CCW quickly at 10 RPM
-    myStepper.setSpeed(10);
-    myStepper.step(-stepsPerRevolution);
+    //myStepper.setSpeed(10);
+    //myStepper.step(-stepsPerRevolution);
     //delay(1000); Use custom delay function
  
-  //using LCD to display humidity and temp ex:
-    int chk = DHT.read11(DHT11_PIN);
-    lcd.setCursor(0,0); 
-    lcd.print("Temp: ");
-    lcd.print(DHT.temperature);
-    lcd.print((char)223);
-    lcd.print("C");
-    lcd.setCursor(0,1);
-    lcd.print("Humidity: ");
-    lcd.print(DHT.humidity);
-    lcd.print("%");
-    //delay(1000); use the delay function
+  
 
 
 
 
   // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
+  
   unsigned long currentMillis = millis(); 
 
   if (currentMillis - previousMillis >= interval) {
@@ -98,9 +111,32 @@ void loop() {
 
     // Write code that updates the LCD with Humidity and temperature for all states EXCEPT Disabled. 
 
+
+    if(state != 0){ //Check if in disabled state before measuring temp and humidity.
+
+    // Attempt to read the temperature and humidity values from the DHT11 sensor.
+    result = dht11.readTemperatureHumidity(temperature, humidity);
+
+    //using LCD to display humidity and temp:
+    lcd.setCursor(0,0); 
+    lcd.print("Temp: ");
+    lcd.print(temperature);
+    lcd.print((char)223);
+    lcd.print("C");
+    lcd.setCursor(0,1);
+    lcd.print("Humidity: ");
+    lcd.print(humidity);
+    lcd.print("%");
+    delay(1000); //use the timer function from lab
+    }
     
   }
 
+//Example of water sensor code. USE GPIO and ADC instead!
+//digitalWrite (POWER_PIN, HIGH); // turn the sensor ON
+//delay(10); // wait 10 milliseconds
+//water_value = analogRead (SIGNAL_PIN); // read the analog value from sensor
+//digitalWrite (POWER_PIN, LOW); // turn the sensor OFF
 }
 
 
