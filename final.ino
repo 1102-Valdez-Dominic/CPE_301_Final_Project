@@ -10,6 +10,8 @@
 //DHT library for temp and humidity sensor
 #include <dht.h>
 
+dht DHT;
+
 
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 2038;
@@ -24,6 +26,8 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
  #define RDA 0x80
  #define TBE 0x20  
+ #define DHT11_PIN 7
+
  volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
  volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
  volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
@@ -51,6 +55,10 @@ void setup() {
   //pinMode(ledPin, OUTPUT); Change to GPIO of Start button pin
   //pinMode(interruptPin, INPUT_PULLUP); Change to GPIO of interruptPin, USE PIN 2!! 
   //attachInterrupt(digitalPinToInterrupt(interruptPin), ??? , RISING); In the ??? space but the name of the function that is called when button is pressed. The function should basically just be flag variable that changes from 0 to 1 so the state can transition 
+
+  //liquid crystal initialization
+  lcd.begin(16, 2);
+
 }
 
 void loop() {
@@ -65,6 +73,21 @@ void loop() {
     myStepper.step(-stepsPerRevolution);
     //delay(1000); Use custom delay function
  
+  //using LCD to display humidity and temp ex:
+    int chk = DHT.read11(DHT11_PIN);
+    lcd.setCursor(0,0); 
+    lcd.print("Temp: ");
+    lcd.print(DHT.temperature);
+    lcd.print((char)223);
+    lcd.print("C");
+    lcd.setCursor(0,1);
+    lcd.print("Humidity: ");
+    lcd.print(DHT.humidity);
+    lcd.print("%");
+    //delay(1000); use the delay function
+
+
+
 
   // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
   unsigned long currentMillis = millis(); 
@@ -161,4 +184,3 @@ void U0putchar(unsigned char U0pdata)
   while ((*myUCSR0A & TBE)==0){};
   *myUDR0 = U0pdata;
 }
-
