@@ -1,7 +1,8 @@
 //Authors: Dominic Valdez, Hamza Syed, 
-//Date: 4/18/24
+//Date: 5/10/24
 
-/* Updates on 4/26/2024: New DHT11 Library included, water sensor library added, tested DHT sensor and LCD  together on board with the 1 minute delay, works. */ 
+/* Updates on 4/26/2024: New DHT11 Library included, tested DHT sensor and LCD  together on board with the 1 minute delay, works. */ 
+/* Updates on 4/28/2024: Added GPIO for vent buttons and tested code for stepper motor with the buttons. Added the my_delay function. */
 
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
@@ -33,18 +34,36 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
 //Pins for the water sensor
 #define POWER_PIN 7 // CHANGE to GPIO digital pin 7
-#define SIGNAL_PIN A5 // CHANGE to GPIO, Analog pin 5
+#define SIGNAL_PIN A5 //Analog pin 5
 
- volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
- volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
- volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
- volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
- volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
+//Register Pointers for my_delay function
+volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
+volatile unsigned char *myTCCR1B = (unsigned char *) 0x81;
+volatile unsigned char *myTCCR1C = (unsigned char *) 0x82;
+volatile unsigned char *myTIMSK1 = (unsigned char *) 0x6F;
+volatile unsigned int  *myTCNT1  = (unsigned  int *) 0x84;
+volatile unsigned char *myTIFR1 =  (unsigned char *) 0x36;
+
+//Pointers for ADC
+volatile unsigned char *myUCSR0A = (unsigned char *)0x00C0;
+volatile unsigned char *myUCSR0B = (unsigned char *)0x00C1;
+volatile unsigned char *myUCSR0C = (unsigned char *)0x00C2;
+volatile unsigned int  *myUBRR0  = (unsigned int *) 0x00C4;
+volatile unsigned char *myUDR0   = (unsigned char *)0x00C6;
 
 volatile unsigned char* my_ADMUX = (unsigned char*) 0x7C;
 volatile unsigned char* my_ADCSRB = (unsigned char*) 0x7B;
 volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
 volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
+
+//Define Register Pointers for the buttons for vent control. Buttons on pins 26 (PA4) and 27 (PA5).
+volatile unsigned char* port_a4 = (unsigned char*) 0x22; 
+volatile unsigned char* ddr_a4  = (unsigned char*) 0x21; 
+volatile unsigned char* pin_a4  = (unsigned char*) 0x20;
+
+volatile unsigned char* port_a5 = (unsigned char*) 0x22; 
+volatile unsigned char* ddr_a5  = (unsigned char*) 0x21; 
+volatile unsigned char* pin_a5  = (unsigned char*) 0x20;
 
 //Variables for the 1 minute delay for the LCD updates
 unsigned long previousMillis = 0;  // will store last time LCD was updated
@@ -63,7 +82,7 @@ void setup() {
   U0init(9600);
   // setup the ADC
   adc_init();
-  // Nothing to do for stepper motor (Stepper Library sets pins as outputs)
+  
 
   // For @buttercup
   //Setup for attach_interupt 
@@ -81,37 +100,24 @@ void setup() {
 pinMode (POWER_PIN, OUTPUT); //Replace with GPIO. Configure D7 pin as an OUTPUT for Water sensor. 
 digitalWrite (POWER_PIN, LOW); //Replace with GPIO. Turn the water sensor OFF. 
 
+//Set Pin 26 (PA4) to INPUT for vent button.
+*ddr_a4 &= 0b11101111;
+
+//Set Pin 27 (PA5) to INPUT for vent button.
+*ddr_a5 &= 0b11011111;
 
 }
 
 void loop() {
-  //Stepper motor Example code:
-    // Rotate CW slowly at 5 RPM
-    //myStepper.setSpeed(5);
-    //myStepper.step(stepsPerRevolution);
-    //delay(1000); Use custom delay function
-
-    // Rotate CCW quickly at 10 RPM
-    //myStepper.setSpeed(10);
-    //myStepper.step(-stepsPerRevolution);
-    //delay(1000); Use custom delay function
- 
-  
-
-
-
 
   // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
-  
   unsigned long currentMillis = millis(); 
 
+  //Updates the LCD every minute with humidity and temperature for all states EXCEPT Disabled.
   if (currentMillis - previousMillis >= interval) {
     // save the last time you updated the LCD
     previousMillis = currentMillis;
-
-    // Write code that updates the LCD with Humidity and temperature for all states EXCEPT Disabled. 
-
-
+ 
     if(state != 0){ //Check if in disabled state before measuring temp and humidity.
 
     // Attempt to read the temperature and humidity values from the DHT11 sensor.
@@ -126,11 +132,25 @@ void loop() {
     lcd.setCursor(0,1);
     lcd.print("Humidity: ");
     lcd.print(humidity);
-    lcd.print("%");
-    delay(1000); //use the timer function from lab
-    }
-    
+    lcd.print("%"); 
+    } 
   }
+
+if(state != 0){
+  //Checks to see if one of the two vent buttons are pushed then rotates the stepper motor depending on which button is pushed
+  if((*pin_a4 & 0b00010000) ){
+    // Rotate CW  at 10 RPM if pin 26 is high
+    myStepper.setSpeed(10);
+    myStepper.step(stepsPerRevolution);
+    my_delay(1000); //Use custom delay function
+  }
+  else if((*pin_a5 & 0b00100000) ){
+    // Rotate CCW quickly at 10 RPM if pin 27 is high
+    myStepper.setSpeed(10);
+    myStepper.step(-stepsPerRevolution);
+    my_delay(1000); //Use custom delay function
+  }
+}
 
 //Example of water sensor code. USE GPIO and ADC instead!
 //digitalWrite (POWER_PIN, HIGH); // turn the sensor ON
@@ -184,10 +204,6 @@ unsigned int adc_read(unsigned char adc_channel_num)
 
 void U0init(unsigned long U0baud)
 {
-  //  Students are responsible for understanding
-  //  this initialization code for the ATmega2560 USART0
-  //  and will be expected to be able to intialize
-  //  the USART in differrent modes.
   unsigned long FCPU = 16000000;
   unsigned int tbaud;
   tbaud = (FCPU / 16 / U0baud - 1);
@@ -219,4 +235,29 @@ void U0putchar(unsigned char U0pdata)
   // transmit buffer
   while ((*myUCSR0A & TBE)==0){};
   *myUDR0 = U0pdata;
+}
+
+void my_delay(unsigned int freq)
+{
+  // calc period
+  double period = 1.0/double(freq);
+  // 50% duty cycle
+  double half_period = period/ 2.0f;
+  // clock period def
+  double clk_period = 0.0000000625;
+  // calc ticks
+  unsigned int ticks = half_period / clk_period;
+  // stop the timer
+  *myTCCR1B &= 0xF8;
+  // set the counts
+  *myTCNT1 = (unsigned int) (65536 - ticks);
+  // start the timer
+  * myTCCR1A = 0x0;
+  * myTCCR1B |= 0b00000001;
+  // wait for overflow
+  while((*myTIFR1 & 0x01)==0); // 0b 0000 0000
+  // stop the timer
+  *myTCCR1B &= 0xF8;   // 0b 0000 0000
+  // reset TOV           
+  *myTIFR1 |= 0x01;
 }
