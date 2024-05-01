@@ -3,4 +3,4 @@ Group 10
 Hamza Syed
 Dominic Valdez
 Matteo Lemus
-__________
+Namira Zinat
