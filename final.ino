@@ -12,9 +12,7 @@
 
 //DHT library for temp and humidity sensor
 #include <DHT11.h>
-
-DHT11 dht11(22);
-
+DHT11 dht11(22); //DHT sensor is on pin 22
 
 // Defines the number of steps per rotation
 const int stepsPerRevolution = 2038;
@@ -27,14 +25,14 @@ const int RS = 12, EN = 11, D4 = 5, D5 = 4, D6 = 3, D7 = 2;
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 //lcd.write()
 
- #define RDA 0x80
- #define TBE 0x20  
+#define RDA 0x80
+#define TBE 0x20  
 
- #define DHT11_PIN 7 // Pin for temp and humidity sensor
+//Threshold in Celcius 
+#define Lower_Temp_Threshold 23
+#define Upper_Temp_Threshold 25
 
-//Pins for the water sensor
-#define POWER_PIN 7 // CHANGE to GPIO digital pin 7
-#define SIGNAL_PIN A5 //Analog pin 5
+#define Lower_Water_Threshold 120
 
 //Register Pointers for my_delay function
 volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
@@ -65,6 +63,45 @@ volatile unsigned char* port_a5 = (unsigned char*) 0x22;
 volatile unsigned char* ddr_a5  = (unsigned char*) 0x21; 
 volatile unsigned char* pin_a5  = (unsigned char*) 0x20;
 
+//Define Register Pointers for the water sensor power, pin 7 (PH4)
+volatile unsigned char* port_h4 = (unsigned char*) 0x102; 
+volatile unsigned char* ddr_h4  = (unsigned char*) 0x101; 
+volatile unsigned char* pin_h4  = (unsigned char*) 0x100;
+
+//Define Register Pointers for the DC motor IC, pin 35 (PC2) for enable, pin 37 (PC0) for IN1 and pin 39 (PG2) for IN2
+volatile unsigned char* port_c2 = (unsigned char*) 0x28; 
+volatile unsigned char* ddr_c2  = (unsigned char*) 0x27; 
+volatile unsigned char* pin_c2  = (unsigned char*) 0x26;
+
+volatile unsigned char* port_c0 = (unsigned char*) 0x28; 
+volatile unsigned char* ddr_c0  = (unsigned char*) 0x27; 
+volatile unsigned char* pin_c0  = (unsigned char*) 0x26;
+
+volatile unsigned char* port_g2 = (unsigned char*) 0x34; 
+volatile unsigned char* ddr_g2  = (unsigned char*) 0x33; 
+volatile unsigned char* pin_g2  = (unsigned char*) 0x32;
+
+//LED GPIO
+//GREEN LED pin 9 PH6
+volatile unsigned char* port_h6 = (unsigned char*) 0x102; 
+volatile unsigned char* ddr_h6  = (unsigned char*) 0x101; 
+volatile unsigned char* pin_h6  = (unsigned char*) 0x100; 
+
+//BLUE LED pin 49 PL0
+volatile unsigned char* port_l0 = (unsigned char*) 0x10B; 
+volatile unsigned char* ddr_l0  = (unsigned char*) 0x10A; 
+volatile unsigned char* pin_l0  = (unsigned char*) 0x109; 
+
+//YELLOW LED pin 51 PB2
+volatile unsigned char* port_b2 = (unsigned char*) 0x25; 
+volatile unsigned char* ddr_b2  = (unsigned char*) 0x24; 
+volatile unsigned char* pin_b2  = (unsigned char*) 0x23; 
+
+//RED LED pin 53 PB0
+volatile unsigned char* port_b0 = (unsigned char*) 0x25; 
+volatile unsigned char* ddr_b0  = (unsigned char*) 0x24; 
+volatile unsigned char* pin_b0  = (unsigned char*) 0x23; 
+
 //Variables for the 1 minute delay for the LCD updates
 unsigned long previousMillis = 0;  // will store last time LCD was updated
 const long interval = 60000;  // interval at which to update LCD (milliseconds)
@@ -83,7 +120,6 @@ void setup() {
   // setup the ADC
   adc_init();
   
-
   // For @buttercup
   //Setup for attach_interupt 
   //pinMode(ledPin, OUTPUT); Change to GPIO of Start button pin
@@ -95,21 +131,111 @@ void setup() {
   lcd.begin(16, 2);// set up number of columns and rows
   lcd.setCursor(0, 0); // move cursor to (0, 0)
 
+  //Setup for Water Sensor
+  *ddr_h4 |= (0x01 << 4); //Water sensor power pin as OUTPUT. 
+  *port_h4 &= ~(0x01 << 4); //Turn the water sensor OFF. 
 
-//Setup for Water Sensor
-pinMode (POWER_PIN, OUTPUT); //Replace with GPIO. Configure D7 pin as an OUTPUT for Water sensor. 
-digitalWrite (POWER_PIN, LOW); //Replace with GPIO. Turn the water sensor OFF. 
+  //Set Pin 26 (PA4) to INPUT for vent button.
+  *ddr_a4 &= 0b11101111;
+  //Set Pin 27 (PA5) to INPUT for vent button.
+  *ddr_a5 &= 0b11011111;
 
-//Set Pin 26 (PA4) to INPUT for vent button.
-*ddr_a4 &= 0b11101111;
+  //Set Motor IC Pins 35,37,39 as OUTPUTs
+  *ddr_c2 |=(0x01 << 2);
+  *ddr_c0 |= (0x01 << 0);
+  *ddr_g2 |= (0x01 << 2);
 
-//Set Pin 27 (PA5) to INPUT for vent button.
-*ddr_a5 &= 0b11011111;
+  //setup LED GPIO
+  //set pl0 to OUTPUT (BLUE)
+  *ddr_l0 |= (0x01 << 0);
+  //set Ph6 to OUTPUT (GREEN) 
+  *ddr_h6 |= (0x01 << 6);
+  //set Pb0 to OUTPUT (RED)
+  *ddr_b0 |= (0x01 << 0);
+  //set pb2 to OUTPUT (YELLOW)
+  *ddr_b2 |= (0x01 << 2);
 
+  //begin in disabled state
+  state = 0;
 }
 
 void loop() {
+  //DISABLED
+  unsigned char data;
 
+  if(state == 0){
+    //yellow LED ON
+    *port_b2 |= (0x01 << 2);
+    //other LEDS OFF
+    *port_b0 &= ~(0x01 << 0);
+    *port_h6 &= ~(0x01 << 6);
+    *port_l0 &= ~(0x01 << 0);
+
+    //if(start button pressed){
+      //state = 1;
+    //}
+    my_delay(1000);      
+  }
+  //IDLE
+  else if(state == 1){
+    //green LED ON
+    *port_h6 |= (0x01 << 6);
+
+    *port_b2 &= ~(0x01 << 2);
+    *port_b0 &= ~(0x01 << 0);
+    *port_l0 &= ~(0x01 << 0);
+    if(temperature > Upper_Temp_Threshold){
+      state = 3;
+    }
+    //else if(water_level <= Lower_Water_Threshold){
+      //state = 2;
+    //}
+    //else if(stop button pressed){
+      //state = 0;
+    //}
+    my_delay(1000);      
+  }
+  //ERROR
+  else if(state == 2){
+    //red LED ON
+    *port_b0 |= (0x01 << 0);
+
+    *port_b2 &= ~(0x01 << 2);
+    *port_h6 &= ~(0x01 << 6);
+    *port_l0 &= ~(0x01 << 0);
+  
+    //if(reset button pressed){
+      //state = 1;
+    //}
+    //else if(stop button pressed){
+      //state = 0;
+    //}
+    my_delay(1000);      
+  }
+  else if(state == 3){
+    //Blue LED ON
+    *port_l0 |= (0x01 << 0);
+    //other LEDS OFF
+    *port_b2 &= ~(0x01 << 2);
+    *port_b0 &= ~(0x01 << 0);
+    *port_h6 &= ~(0x01 << 6);
+
+    //if(water_level < Lower_Water_Threshold){
+      //state = 2;
+    //}
+    //else if(temperature <= Lower_Temp_Threshold){
+      //state = 1;
+    //}
+    //else if(stop button pressed){
+      //state = 0;
+    //}
+    my_delay(1000);      
+  }
+  
+my_delay(1000);      
+U0putchar('\n');
+
+/*
   // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
   unsigned long currentMillis = millis(); 
 
@@ -151,12 +277,49 @@ if(state != 0){
     my_delay(1000); //Use custom delay function
   }
 }
+*/
 
-//Example of water sensor code. USE GPIO and ADC instead!
-//digitalWrite (POWER_PIN, HIGH); // turn the sensor ON
-//delay(10); // wait 10 milliseconds
-//water_value = analogRead (SIGNAL_PIN); // read the analog value from sensor
-//digitalWrite (POWER_PIN, LOW); // turn the sensor OFF
+//state = 3;
+//temperature = 26;
+//RUNNING
+/*
+  if((state == 3) && (temperature > Upper_Temp_Threshold)){//Condition to enter Running state
+    
+    state = 3; //Set state varaible to running
+
+    //Monitor Water Level
+    *port_h4 |= (0x01 << 4); //Turn the water sensor ON.
+    unsigned int water_level = adc_read(5); // read the analog value from sensor
+    printvolt(water_level);
+    U0putchar('V');
+    U0putchar('\n');
+    my_delay(10);
+
+    //Turn on motor
+    *port_c2 |=(0x01 << 2); //enable pin high
+    *port_c0 |= (0x01 << 0); //IN1 pin high
+    *port_g2 &= ~(0x01 << 2); //IN2 pin low
+
+    //Turn on Blue LED and turn off other LEDs
+    //*port_l0 |= (0x01 << 0);
+    //off
+    *port_l0 &= ~(0x01 << 0);
+
+    //green
+    //*port_h6 |= (0x01 << 6);
+    //off
+    //*port_h6 &= ~(0x01 << 6);
+
+    //red
+    //*port_b0 |= (0x01 << 0);
+    //*port_b0 &= ~(0x01 << 0);
+
+    //yellow
+    //*port_b2 |= (0x01 << 2);
+    //off
+    //*port_b2 &= ~(0x01 << 2);
+  }
+*/
 }
 
 
@@ -250,7 +413,7 @@ void my_delay(unsigned int freq)
   // stop the timer
   *myTCCR1B &= 0xF8;
   // set the counts
-  *myTCNT1 = (unsigned int) (65536 - ticks);
+  *myTCNT1 = (unsigned int) (65536 - freq);
   // start the timer
   * myTCCR1A = 0x0;
   * myTCCR1B |= 0b00000001;
@@ -260,4 +423,28 @@ void my_delay(unsigned int freq)
   *myTCCR1B &= 0xF8;   // 0b 0000 0000
   // reset TOV           
   *myTIFR1 |= 0x01;
+  delay(freq - 500); //test with old (remove after)
+}
+
+void printvolt(unsigned int analogValue){
+  unsigned char flag = 0;
+  if(analogValue >= 1000){
+    U0putchar(analogValue/1000 + '0');
+    flag = 1;
+    analogValue = analogValue % 1000;
+  }
+  U0putchar('.');
+  if(analogValue >= 100 || flag == 1){
+    U0putchar(analogValue/100 + '0');
+    flag = 1;
+    analogValue = analogValue % 100;
+  }
+  if(analogValue >= 10 || flag == 1){
+    U0putchar(analogValue/10 + '0');
+    flag = 1;
+    analogValue = analogValue % 10;
+  }
+  U0putchar(analogValue + '0');
+
+  return analogValue;
 }
