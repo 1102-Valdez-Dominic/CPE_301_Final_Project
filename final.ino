@@ -1,8 +1,6 @@
-//Authors: Dominic Valdez, Hamza Syed, 
-//Date: 5/10/24
 
-/* Updates on 4/26/2024: New DHT11 Library included, tested DHT sensor and LCD  together on board with the 1 minute delay, works. */ 
-/* Updates on 4/28/2024: Added GPIO for vent buttons and tested code for stepper motor with the buttons. Added the my_delay function. */
+//Authors: Dominic Valdez, Hamza Syed, ZInat Namira
+//Date: 5/10/24
 
 //Includes the Arduino Stepper Library
 #include <Stepper.h>
@@ -28,11 +26,11 @@ LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 #define RDA 0x80
 #define TBE 0x20  
 
-//Threshold in Celcius 
+//Threshold in Celcius
 #define Lower_Temp_Threshold 23
 #define Upper_Temp_Threshold 25
 
-#define Lower_Water_Threshold 120
+#define Lower_Water_Threshold 150
 
 //Register Pointers for my_delay function
 volatile unsigned char *myTCCR1A = (unsigned char *) 0x80;
@@ -55,52 +53,60 @@ volatile unsigned char* my_ADCSRA = (unsigned char*) 0x7A;
 volatile unsigned int* my_ADC_DATA = (unsigned int*) 0x78;
 
 //Define Register Pointers for the buttons for vent control. Buttons on pins 26 (PA4) and 27 (PA5).
-volatile unsigned char* port_a4 = (unsigned char*) 0x22; 
-volatile unsigned char* ddr_a4  = (unsigned char*) 0x21; 
+volatile unsigned char* port_a4 = (unsigned char*) 0x22;
+volatile unsigned char* ddr_a4  = (unsigned char*) 0x21;
 volatile unsigned char* pin_a4  = (unsigned char*) 0x20;
 
-volatile unsigned char* port_a5 = (unsigned char*) 0x22; 
-volatile unsigned char* ddr_a5  = (unsigned char*) 0x21; 
+volatile unsigned char* port_a5 = (unsigned char*) 0x22;
+volatile unsigned char* ddr_a5  = (unsigned char*) 0x21;
 volatile unsigned char* pin_a5  = (unsigned char*) 0x20;
 
 //Define Register Pointers for the water sensor power, pin 7 (PH4)
-volatile unsigned char* port_h4 = (unsigned char*) 0x102; 
-volatile unsigned char* ddr_h4  = (unsigned char*) 0x101; 
+volatile unsigned char* port_h4 = (unsigned char*) 0x102;
+volatile unsigned char* ddr_h4  = (unsigned char*) 0x101;
 volatile unsigned char* pin_h4  = (unsigned char*) 0x100;
 
-//Define Register Pointers for the DC motor IC, pin 35 (PC2) for enable, pin 37 (PC0) for IN1 and pin 39 (PG2) for IN2
-volatile unsigned char* port_c2 = (unsigned char*) 0x28; 
-volatile unsigned char* ddr_c2  = (unsigned char*) 0x27; 
+//Define Register Pointers for the DC motor, pin 35 (PC2)
+volatile unsigned char* port_c2 = (unsigned char*) 0x28;
+volatile unsigned char* ddr_c2  = (unsigned char*) 0x27;
 volatile unsigned char* pin_c2  = (unsigned char*) 0x26;
 
-volatile unsigned char* port_c0 = (unsigned char*) 0x28; 
-volatile unsigned char* ddr_c0  = (unsigned char*) 0x27; 
-volatile unsigned char* pin_c0  = (unsigned char*) 0x26;
-
-volatile unsigned char* port_g2 = (unsigned char*) 0x34; 
-volatile unsigned char* ddr_g2  = (unsigned char*) 0x33; 
-volatile unsigned char* pin_g2  = (unsigned char*) 0x32;
 
 //LED GPIO
 //GREEN LED pin 9 PH6
-volatile unsigned char* port_h6 = (unsigned char*) 0x102; 
-volatile unsigned char* ddr_h6  = (unsigned char*) 0x101; 
-volatile unsigned char* pin_h6  = (unsigned char*) 0x100; 
+volatile unsigned char* port_h6 = (unsigned char*) 0x102;
+volatile unsigned char* ddr_h6  = (unsigned char*) 0x101;
+volatile unsigned char* pin_h6  = (unsigned char*) 0x100;
 
 //BLUE LED pin 49 PL0
-volatile unsigned char* port_l0 = (unsigned char*) 0x10B; 
-volatile unsigned char* ddr_l0  = (unsigned char*) 0x10A; 
-volatile unsigned char* pin_l0  = (unsigned char*) 0x109; 
+volatile unsigned char* port_l0 = (unsigned char*) 0x10B;
+volatile unsigned char* ddr_l0  = (unsigned char*) 0x10A;
+volatile unsigned char* pin_l0  = (unsigned char*) 0x109;
 
 //YELLOW LED pin 51 PB2
-volatile unsigned char* port_b2 = (unsigned char*) 0x25; 
-volatile unsigned char* ddr_b2  = (unsigned char*) 0x24; 
-volatile unsigned char* pin_b2  = (unsigned char*) 0x23; 
+volatile unsigned char* port_b2 = (unsigned char*) 0x25;
+volatile unsigned char* ddr_b2  = (unsigned char*) 0x24;
+volatile unsigned char* pin_b2  = (unsigned char*) 0x23;
 
 //RED LED pin 53 PB0
-volatile unsigned char* port_b0 = (unsigned char*) 0x25; 
-volatile unsigned char* ddr_b0  = (unsigned char*) 0x24; 
-volatile unsigned char* pin_b0  = (unsigned char*) 0x23; 
+volatile unsigned char* port_b0 = (unsigned char*) 0x25;
+volatile unsigned char* ddr_b0  = (unsigned char*) 0x24;
+volatile unsigned char* pin_b0  = (unsigned char*) 0x23;
+
+//GPIO for start button pin 18 (PD3)
+volatile unsigned char* port_d3 = (unsigned char*) 0x2B;
+volatile unsigned char* ddr_d3  = (unsigned char*) 0x2A;
+volatile unsigned char* pin_d3  = (unsigned char*) 0x29;
+
+//GPIO for reset button pin 19 (PD2)
+volatile unsigned char* port_d2 = (unsigned char*) 0x2B;
+volatile unsigned char* ddr_d2  = (unsigned char*) 0x2A;
+volatile unsigned char* pin_d2  = (unsigned char*) 0x29;
+
+//GPIO for stop button pin 20 (PD1)
+volatile unsigned char* port_d1 = (unsigned char*) 0x2B;
+volatile unsigned char* ddr_d1  = (unsigned char*) 0x2A;
+volatile unsigned char* pin_d1  = (unsigned char*) 0x29;
 
 //Variables for the 1 minute delay for the LCD updates
 unsigned long previousMillis = 0;  // will store last time LCD was updated
@@ -110,7 +116,7 @@ int temperature = 0;
 int humidity = 0;
 int result = 0; //Variable to store temp and humidity values
 
-int water_value = 0; // variable to store the water sensor value
+int water_value; // variable to store the water sensor value
 
 int state = 0; //Variable to keep track of the states, 0 = disabled, 1 = idle, 2 = error, 3 = running
 
@@ -119,50 +125,55 @@ void setup() {
   U0init(9600);
   // setup the ADC
   adc_init();
-  
-  // For @buttercup
-  //Setup for attach_interupt 
-  //pinMode(ledPin, OUTPUT); Change to GPIO of Start button pin
-  //pinMode(interruptPin, INPUT_PULLUP); Change to GPIO of interruptPin, USE digital PIN 18!! 
-  //attachInterrupt(digitalPinToInterrupt(interruptPin), ??? , RISING); In the ??? space but the name of the function that is called when button is pressed. The function should basically just be flag variable that changes from 0 to 1 so the state can transition 
-
+ 
+  //Setup for attach_interupt
+  attachInterrupt(digitalPinToInterrupt(18), start , RISING); //Interupt for start button
+  attachInterrupt(digitalPinToInterrupt(20), stop , RISING); // Interupt for stop button
+ 
   //liquid crystal initialization
   lcd.clear();
   lcd.begin(16, 2);// set up number of columns and rows
   lcd.setCursor(0, 0); // move cursor to (0, 0)
 
   //Setup for Water Sensor
-  *ddr_h4 |= (0x01 << 4); //Water sensor power pin as OUTPUT. 
-  *port_h4 &= ~(0x01 << 4); //Turn the water sensor OFF. 
+  *ddr_h4 |= (0x01 << 4); //Water sensor power pin as OUTPUT.
+  *port_h4 &= ~(0x01 << 4); //Turn the water sensor OFF.
 
   //Set Pin 26 (PA4) to INPUT for vent button.
   *ddr_a4 &= 0b11101111;
   //Set Pin 27 (PA5) to INPUT for vent button.
   *ddr_a5 &= 0b11011111;
 
-  //Set Motor IC Pins 35,37,39 as OUTPUTs
+  //Set Motor pin as OUTPUT
   *ddr_c2 |=(0x01 << 2);
-  *ddr_c0 |= (0x01 << 0);
-  *ddr_g2 |= (0x01 << 2);
 
   //setup LED GPIO
   //set pl0 to OUTPUT (BLUE)
   *ddr_l0 |= (0x01 << 0);
-  //set Ph6 to OUTPUT (GREEN) 
+  //set Ph6 to OUTPUT (GREEN)
   *ddr_h6 |= (0x01 << 6);
   //set Pb0 to OUTPUT (RED)
   *ddr_b0 |= (0x01 << 0);
   //set pb2 to OUTPUT (YELLOW)
   *ddr_b2 |= (0x01 << 2);
 
+  //Setup ISR pin as INPUT
+  *ddr_d3 &= ~(0x01 << 3);
+
+  //Setup reset button pin as INPUT
+  *ddr_d2 &= ~(0x01 << 2);
+
+  //Setup stop button pin as INPUT
+  *ddr_d1 &= ~(0x01 << 1);
+
   //begin in disabled state
   state = 0;
+  
 }
 
 void loop() {
-  //DISABLED
-  unsigned char data;
 
+  //DISABLED
   if(state == 0){
     //yellow LED ON
     *port_b2 |= (0x01 << 2);
@@ -170,49 +181,67 @@ void loop() {
     *port_b0 &= ~(0x01 << 0);
     *port_h6 &= ~(0x01 << 6);
     *port_l0 &= ~(0x01 << 0);
+    
+    //Turn off motor
+    *port_c2 &= ~(0x01 << 2);
 
-    //if(start button pressed){
-      //state = 1;
-    //}
     my_delay(1000);      
   }
   //IDLE
-  else if(state == 1){
+  if(state == 1){
     //green LED ON
     *port_h6 |= (0x01 << 6);
-
+    //other LEDS OFF
     *port_b2 &= ~(0x01 << 2);
     *port_b0 &= ~(0x01 << 0);
     *port_l0 &= ~(0x01 << 0);
+
+    //Turn off motor
+    *port_c2 &= ~(0x01 << 2);
+
+    //Monitor Water Level
+    *port_h4 |= (0x01 << 4); //Turn the water sensor ON.
+    unsigned int water_level = adc_read(5); // read the analog value from sensor
+    printvolt(water_level);
+    U0putchar('V');
+    U0putchar('\n');
+    my_delay(1000);
+
+    Humidity_Temp_Monitor(); //Monitor temperature and humidity on LCD every minute
+    VentControl(); //Allow vent position control with two buttons
+    
     if(temperature > Upper_Temp_Threshold){
       state = 3;
     }
-    //else if(water_level <= Lower_Water_Threshold){
-      //state = 2;
-    //}
-    //else if(stop button pressed){
-      //state = 0;
-    //}
+    if(water_value <= Lower_Water_Threshold){
+      state = 2;
+    }
+
     my_delay(1000);      
   }
   //ERROR
-  else if(state == 2){
+  if(state == 2){
     //red LED ON
     *port_b0 |= (0x01 << 0);
-
+    //other LEDS OFF
     *port_b2 &= ~(0x01 << 2);
     *port_h6 &= ~(0x01 << 6);
     *port_l0 &= ~(0x01 << 0);
-  
-    //if(reset button pressed){
-      //state = 1;
-    //}
-    //else if(stop button pressed){
-      //state = 0;
-    //}
+
+    //Turn off motor
+    *port_c2 &= ~(0x01 << 2);
+
+    Humidity_Temp_Monitor(); //Monitor temperature and humidity on LCD every minute
+    VentControl(); //Allow vent position control with two buttons
+ 
+    if(*pin_d2 & (0x01 << 2)){ //Reset button pressed
+      state = 1;
+    }
+
     my_delay(1000);      
   }
-  else if(state == 3){
+  //RUNNING
+  if(state == 3){
     //Blue LED ON
     *port_l0 |= (0x01 << 0);
     //other LEDS OFF
@@ -220,72 +249,8 @@ void loop() {
     *port_b0 &= ~(0x01 << 0);
     *port_h6 &= ~(0x01 << 6);
 
-    //if(water_level < Lower_Water_Threshold){
-      //state = 2;
-    //}
-    //else if(temperature <= Lower_Temp_Threshold){
-      //state = 1;
-    //}
-    //else if(stop button pressed){
-      //state = 0;
-    //}
-    my_delay(1000);      
-  }
-  
-my_delay(1000);      
-U0putchar('\n');
-
-/*
-  // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
-  unsigned long currentMillis = millis(); 
-
-  //Updates the LCD every minute with humidity and temperature for all states EXCEPT Disabled.
-  if (currentMillis - previousMillis >= interval) {
-    // save the last time you updated the LCD
-    previousMillis = currentMillis;
- 
-    if(state != 0){ //Check if in disabled state before measuring temp and humidity.
-
-    // Attempt to read the temperature and humidity values from the DHT11 sensor.
-    result = dht11.readTemperatureHumidity(temperature, humidity);
-
-    //using LCD to display humidity and temp:
-    lcd.setCursor(0,0); 
-    lcd.print("Temp: ");
-    lcd.print(temperature);
-    lcd.print((char)223);
-    lcd.print("C");
-    lcd.setCursor(0,1);
-    lcd.print("Humidity: ");
-    lcd.print(humidity);
-    lcd.print("%"); 
-    } 
-  }
-
-if(state != 0){
-  //Checks to see if one of the two vent buttons are pushed then rotates the stepper motor depending on which button is pushed
-  if((*pin_a4 & 0b00010000) ){
-    // Rotate CW  at 10 RPM if pin 26 is high
-    myStepper.setSpeed(10);
-    myStepper.step(stepsPerRevolution);
-    my_delay(1000); //Use custom delay function
-  }
-  else if((*pin_a5 & 0b00100000) ){
-    // Rotate CCW quickly at 10 RPM if pin 27 is high
-    myStepper.setSpeed(10);
-    myStepper.step(-stepsPerRevolution);
-    my_delay(1000); //Use custom delay function
-  }
-}
-*/
-
-//state = 3;
-//temperature = 26;
-//RUNNING
-/*
-  if((state == 3) && (temperature > Upper_Temp_Threshold)){//Condition to enter Running state
-    
-    state = 3; //Set state varaible to running
+    //Turn on motor
+    *port_c2 |=(0x01 << 2); //motor pin high
 
     //Monitor Water Level
     *port_h4 |= (0x01 << 4); //Turn the water sensor ON.
@@ -295,34 +260,25 @@ if(state != 0){
     U0putchar('\n');
     my_delay(10);
 
-    //Turn on motor
-    *port_c2 |=(0x01 << 2); //enable pin high
-    *port_c0 |= (0x01 << 0); //IN1 pin high
-    *port_g2 &= ~(0x01 << 2); //IN2 pin low
+    Humidity_Temp_Monitor(); //Monitor temperature and humidity on LCD every minute
+    VentControl(); //Allow vent position control with two buttons
 
-    //Turn on Blue LED and turn off other LEDs
-    //*port_l0 |= (0x01 << 0);
-    //off
-    *port_l0 &= ~(0x01 << 0);
-
-    //green
-    //*port_h6 |= (0x01 << 6);
-    //off
-    //*port_h6 &= ~(0x01 << 6);
-
-    //red
-    //*port_b0 |= (0x01 << 0);
-    //*port_b0 &= ~(0x01 << 0);
-
-    //yellow
-    //*port_b2 |= (0x01 << 2);
-    //off
-    //*port_b2 &= ~(0x01 << 2);
+    if(water_level < Lower_Water_Threshold){
+     state = 2;
+    }
+    if(temperature <= Lower_Temp_Threshold){
+      state = 1;
+    }
+    my_delay(1000);   
   }
-*/
+
+  
 }
 
-
+//---------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------//
+//---------------------------------------------------------------------------------------------------------------//
+//Functions
 
 void adc_init()
 {
@@ -389,7 +345,7 @@ unsigned char U0getchar()
   unsigned char ch;
   ch = *myUDR0;
   return ch;
-  
+ 
 }
 
 void U0putchar(unsigned char U0pdata)
@@ -421,9 +377,9 @@ void my_delay(unsigned int freq)
   while((*myTIFR1 & 0x01)==0); // 0b 0000 0000
   // stop the timer
   *myTCCR1B &= 0xF8;   // 0b 0000 0000
-  // reset TOV           
+  // reset TOV          
   *myTIFR1 |= 0x01;
-  delay(freq - 500); //test with old (remove after)
+  //delay(freq - 500); //test with old (remove after)
 }
 
 void printvolt(unsigned int analogValue){
@@ -446,5 +402,58 @@ void printvolt(unsigned int analogValue){
   }
   U0putchar(analogValue + '0');
 
-  return analogValue;
+}
+
+void start(){
+  if(state == 0){
+  state = 1;
+  }
+}
+
+void stop(){
+ if(state != 0){
+    state = 0;
+  }
+}
+
+void Humidity_Temp_Monitor(){
+  // The code below uses the millis() function, a command that returns the number of milliseconds since the board started running the sketch
+  unsigned long currentMillis = millis();
+
+  //Updates the LCD every minute with humidity and temperature for all states EXCEPT Disabled.
+  if (currentMillis - previousMillis >= interval) {
+    // save the last time you updated the LCD
+    previousMillis = currentMillis;
+ 
+    // Attempt to read the temperature and humidity values from the DHT11 sensor.
+    result = dht11.readTemperatureHumidity(temperature, humidity);
+    my_delay(1000);
+    //using LCD to display humidity and temp:
+    lcd.setCursor(0,0);
+    lcd.print("Temp: ");
+    lcd.print(temperature);
+    lcd.print((char)223);
+    lcd.print("C");
+    lcd.setCursor(0,1);
+    lcd.print("Humidity: ");
+    lcd.print(humidity);
+    lcd.print("%");
+    
+  }
+}
+
+void VentControl(){
+  //Checks to see if one of the two vent buttons are pushed then rotates the stepper motor depending on which button is pushed
+  if((*pin_a4 & 0b00010000) ){
+    // Rotate CW at 10 RPM if pin 26 button is high
+    myStepper.setSpeed(10);
+    myStepper.step(stepsPerRevolution);
+    my_delay(1000); 
+  }
+  else if((*pin_a5 & 0b00100000) ){
+    // Rotate CCW at 10 RPM if pin 27 button is high
+    myStepper.setSpeed(10);
+    myStepper.step(-stepsPerRevolution);
+    my_delay(1000); 
+  }
 }
