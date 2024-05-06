@@ -3,64 +3,69 @@
 #include <RTC.h>
 #include <DHT.h>
 
-#define GREEN_LED 9
+// Define pointer-based registers
+// Green LED pin
+volatile unsigned char* GREEN_LED = (volatile unsigned char*) 0x102;
 
-#define FAN_PIN 6
-// Register for Pin 9 which is the green LED
-volatile unsigned char* port_h = (unsigned char*) 0x102;
-volatile unsigned char* ddr_h = (unsigned char*) 0x101;
-volatile unsigned char* pin_h = (unsigned char*) 0x100;
+// Stepper motor pins
+volatile unsigned char* stepperPins[] = {(volatile unsigned char*) 0x2E, (volatile unsigned char*) 0x32, (volatile unsigned char*) 0x30, (volatile unsigned char*) 0x34};
 
+// Button pins
+volatile unsigned char* buttonPins[] = {(volatile unsigned char*) 0x1A, (volatile unsigned char*) 0x1B};
 
 // LCD pins
-const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+const int rs = 2, en = 3, d4 = 4, d5 = 5, d6 = 11, d7 = 12;
 LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 // RTC module
 RTC rtc;
 
 // DHT sensor
-#define DHT_PIN 5
-#define DHT_TYPE DHT11
-DHT dht(DHT_PIN, DHT_TYPE);
+volatile unsigned char* DHT_PIN = (volatile unsigned char*) 22;
+volatile unsigned char* DHT_TYPE = (volatile unsigned char*) 11;
+DHT dht((uint8_t) DHT_PIN, (uint8_t) DHT_TYPE);
 
-// Water level sensor pin
-#define WATER_LEVEL_PIN A0
-#define WATER_THRESHOLD 300 // Adjust according to your sensor
+// Water level sensor pins
+volatile unsigned char* WATER_LEVEL_PIN = (volatile unsigned char*) 0x10; // Analog Pin 5
+const int WATER_THRESHOLD = 300; // Adjust according to your sensor
 
 // Time variables
 unsigned long lastTempHumidityUpdate = 0;
 const unsigned long updateInterval = 60000; // Update once per minute
 
-void setup() {
-*ddr_h |= (0x01 << 6); // Set PH6 as output
+// Register manipulation pointers for Pin 9 (Green LED)
+volatile unsigned char* port_h = (volatile unsigned char*) 0x102;
+volatile unsigned char* ddr_h = (volatile unsigned char*) 0x101;
+volatile unsigned char* pin_h = (volatile unsigned char*) 0x100;
 
-  lcd.begin(16, 2);
-  rtc.begin();
-  dht.begin();
-  
-  changeState(IDLE);
+void setup() {
+    *ddr_h |= (0x01 << 6); // Set PH6 as output
+
+    lcd.begin(16, 2);
+    rtc.begin();
+    dht.begin();
+
+    changeState(IDLE);
 }
 
-enum State {DISABLED, IDLE, ERROR, RUNNING};
+enum State { DISABLED, IDLE, ERROR, RUNNING };
 State currentState = DISABLED;
 
 void loop() {
-  switch (currentState) {
-    case IDLE:
-      idleState();
-      break;
-  }
+    switch (currentState) {
+        case IDLE:
+            idleState();
+            break;
+    }
 }
 
 void idleState() {
-  // Monitor water level
-  int waterLevel = analogRead(WATER_LEVEL_PIN);
-  if (waterLevel < WATER_THRESHOLD) {
-    changeState(ERROR);
-    return;
-  }
-  // Green LED is ON in IDLE state
-*port_h = (0x01 << 6);
+    // Monitor water level
+    int waterLevel = analogRead((uint8_t)WATER_LEVEL_PIN);
+    if (waterLevel < WATER_THRESHOLD) {
+        changeState(ERROR);
+        return;
+    }
+    // Green LED is ON in IDLE state
+    *port_h |= (0x01 << 6);
 }
-
