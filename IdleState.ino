@@ -27,7 +27,7 @@ DHT dht((uint8_t) DHT_PIN, (uint8_t) DHT_TYPE);
 
 // Water level sensor pins
 volatile unsigned char* WATER_LEVEL_PIN = (volatile unsigned char*) 0x10; // Analog Pin 5
-const int WATER_THRESHOLD = 300; // Adjust according to your sensor
+const int WATER_THRESHOLD = 300; // Adjust according to sensor
 
 // Time variables
 unsigned long lastTempHumidityUpdate = 0;
