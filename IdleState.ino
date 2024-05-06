@@ -6,6 +6,11 @@
 #define GREEN_LED 9
 
 #define FAN_PIN 6
+// Register for Pin 9 which is the green LED
+volatile unsigned char* port_h = (unsigned char*) 0x102;
+volatile unsigned char* ddr_h = (unsigned char*) 0x101;
+volatile unsigned char* pin_h = (unsigned char*) 0x100;
+
 
 // LCD pins
 const int rs = 7, en = 6, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
@@ -28,8 +33,7 @@ unsigned long lastTempHumidityUpdate = 0;
 const unsigned long updateInterval = 60000; // Update once per minute
 
 void setup() {
-  pinMode(GREEN_LED, OUTPUT);
-  pinMode(FAN_PIN, OUTPUT);
+*ddr_h |= (0x01 << 6); // Set PH6 as output
 
   lcd.begin(16, 2);
   rtc.begin();
@@ -46,7 +50,6 @@ void loop() {
     case IDLE:
       idleState();
       break;
-    // Other states can be handled here...
   }
 }
 
@@ -57,41 +60,7 @@ void idleState() {
     changeState(ERROR);
     return;
   }
-  
-  // Monitor temperature and humidity
-  unsigned long currentMillis = millis();
-  if (currentMillis - lastTempHumidityUpdate >= updateInterval) {
-    float temperature = dht.readTemperature();
-    float humidity = dht.readHumidity();
-    
-    // Display on LCD
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Temp: ");
-    lcd.print(temperature);
-    lcd.setCursor(0, 1);
-    lcd.print("Humidity: ");
-    lcd.print(humidity);
-    
-    lastTempHumidityUpdate = currentMillis;
-  }
-  
   // Green LED is ON in IDLE state
-  digitalWrite(GREEN_LED, HIGH);
+*port_h = (0x01 << 6);
 }
 
-void changeState(State newState) {
-  // Turn off all LEDs
-  digitalWrite(GREEN_LED, LOW);
-  
-  currentState = newState;
-  switch (currentState) {
-    case IDLE:
-      digitalWrite(GREEN_LED, HIGH);
-      // Log the state transition with the real-time clock
-      rtc.now().printToSerial();
-      Serial.println(" - Transitioned to IDLE state");
-      break;
-    // Handle other states...
-  }
-}
