@@ -38,6 +38,13 @@ volatile unsigned char* port_h = (volatile unsigned char*) 0x102;
 volatile unsigned char* ddr_h = (volatile unsigned char*) 0x101;
 volatile unsigned char* pin_h = (volatile unsigned char*) 0x100;
 
+// Idle state start time
+unsigned long idleStartTime = 0;
+
+// LCD update interval
+const unsigned long lcdUpdateInterval = 1000; // Update LCD every second
+unsigned long lastLcdUpdateTime = 0;
+
 void setup() {
     *ddr_h |= (0x01 << 6); // Set PH6 as output
 
@@ -66,6 +73,44 @@ void idleState() {
         changeState(ERROR);
         return;
     }
+
     // Green LED is ON in IDLE state
     *port_h |= (0x01 << 6);
+    
+    // Update LCD display with real-time timestamp and idle state duration
+    updateLcd();
 }
+
+void updateLcd() {
+    unsigned long currentMillis = millis();
+    
+    // Update LCD every second
+    if (currentMillis - lastLcdUpdateTime >= lcdUpdateInterval) {
+        lastLcdUpdateTime = currentMillis;
+        
+        // Get current date and time from RTC
+        DateTime now = rtc.now();
+        
+        // Format current time as a string (HH:MM:SS)
+        char currentTime[9];
+        snprintf(currentTime, sizeof(currentTime), "%02d:%02d:%02d", now.hour(), now.minute(), now.second());
+        
+        // Calculate idle time duration
+        unsigned long idleDuration = (currentMillis - idleStartTime) / 1000;
+        unsigned long idleMinutes = idleDuration / 60;
+        unsigned long idleSeconds = idleDuration % 60;
+        
+        // Display the current time on the first line of the LCD
+        lcd.setCursor(0, 0);
+        lcd.print(currentTime);
+        
+        // Display the idle time duration on the second line of the LCD
+        lcd.setCursor(0, 1);
+        lcd.print("Idle: ");
+        lcd.print(idleMinutes);
+        lcd.print("m ");
+        lcd.print(idleSeconds);
+        lcd.print("s");
+    }
+}
+
