@@ -221,6 +221,10 @@ void loop() {
   }
   //ERROR
   if(state == 2){
+    //using LCD to display error message:
+    lcd.setCursor(0,0); 
+    lcd.print("Water level is too low");
+
     //red LED ON
     *port_b0 |= (0x01 << 0);
     //other LEDS OFF
